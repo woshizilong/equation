@@ -15,41 +15,44 @@ const (
 	SideOne SideCount = iota // 未知数出现在一边
 	SideTwo                  // 未知数出现在两边
 
-	BracketNeed      Bracket = iota // 需要括号
-	BracketNoNeed                   // 不需要括号
-	BracketUncertain                // 不确定(随机决定是否需要)
+	NeedYes       Need = iota // 需要
+	NeedNo                    // 不需要
+	NeedUncertain             // 不确定(随机决定是否需要)
 )
 
 type (
+	// 未知数出现在一边还是两边
 	SideCount int
-	Bracket   int
+	// 需求情况
+	Need int
 )
 
+// 一元一次方程
 type EquationOneOperand struct {
 	Side           SideCount // 未知数出现在一边还是两边
-	bracket        bool      // 是否需要括号
-	Value          int       // 未知数的值
-	coefficientOne int       // 第一系数
-	coefficiectTwo int       // 第二系数
-	sum            int       // 单边的值
-	equation1      string    // 公式1
-	equation2      string    // 公式2
+	Value          int       // 未知数的值(用于公布答案)
+	needBracket    bool      // 是否需要括号
+	needCefficient bool      // 是否需要给未知数添加系数
+	sum            int       // 单边的计算结果值
+	equation1      string    // 生成的公式1
+	equation2      string    // 生成的公式2
 }
 
-func NewEquationOneOperand(side SideCount, bracket Bracket, minValue, maxValue int, minCoefficient, maxCoefficient int) *EquationOneOperand {
+// 构造一元一次等式
+func NewEquationOneOperand(side SideCount, bracket Need, minValue, maxValue int, minCoefficient, maxCoefficient int) *EquationOneOperand {
 	e := &EquationOneOperand{
 		Side:  side,
 		Value: RandInt(minValue, maxValue),
 	}
-	if bracket == BracketUncertain {
-		e.bracket = RandBool()
-	} else if bracket == BracketNeed {
-		e.bracket = true
+	if bracket == NeedUncertain {
+		e.needBracket = RandBool()
+	} else if bracket == NeedYes {
+		e.needBracket = true
 	} else {
-		e.bracket = false
+		e.needBracket = false
 	}
 	// 第一章节：生成公式1
-	e.equation1, e.sum = NewEquation(e.Side, e.bracket, e.Value, e.Value, minCoefficient, maxCoefficient)
+	e.equation1, e.sum = NewEquation(e.Side, e.needBracket, e.Value, minCoefficient, maxCoefficient)
 
 	// 第二章节：反推公式2
 	// 第一步：确定单双边
@@ -65,7 +68,7 @@ func NewEquationOneOperand(side SideCount, bracket Bracket, minValue, maxValue i
 		// 	// 几率40%，公式2为公式1的值加一个小数
 		// }
 
-		e.equation2 = Calculate(e.sum, 20, 40, 40)
+		e.equation2 = NewCalculate(e.sum, 20, 40, 40)
 	} else {
 		// 双边时反向生成公式2
 	}
@@ -73,11 +76,11 @@ func NewEquationOneOperand(side SideCount, bracket Bracket, minValue, maxValue i
 	return e
 }
 
-// 构造一个计算等式(不含未知数)
+// 构造一个数字计算等式(不含未知数)
 // numberPercent 数字出现的几率
 // simplePercent 简单运算出现的几率
 // complexPercent 复杂运算出现的几率
-func Calculate(sum int, numberPercent, simplePercent, complexPercent int) string {
+func NewCalculate(sum int, numberPercent, simplePercent, complexPercent int) string {
 	probability := RandInt(1, 100)
 
 	if probability <= numberPercent {
@@ -85,47 +88,54 @@ func Calculate(sum int, numberPercent, simplePercent, complexPercent int) string
 		return fmt.Sprintf("%d", sum)
 	} else if probability <= numberPercent+simplePercent {
 		// 简单运算
-		return CalculateSimple(sum)
+		return NewCalculateSimple(sum)
 	} else {
 		// 复杂运算
 
 		// 生成括号内的计算式
-		subSum := RandIntExclude(2, 10, sum)
-		equation := fmt.Sprintf("(%s)", CalculateSimple(subSum))
+		subSum := RandIntExclude(2, 19, sum)
+		equation := fmt.Sprintf("(%s)", NewCalculateSimple(subSum))
 		// 生成系数
-		coefficient := RandIntExclude(-13, 9, -1, 0, 1)
+		coefficient := RandIntExclude(-13, 9, 0)
 		// 融入系数
 		subSum = coefficient * subSum
-		equation = fmt.Sprintf("%d%s", coefficient, equation)
+		switch coefficient {
+		case -1:
+			equation = fmt.Sprintf("-%s", equation)
+		case 1:
+			equation = fmt.Sprintf("%s", equation)
+		default:
+			equation = fmt.Sprintf("%d%s", coefficient, equation)
+		}
+
 		// 判断系数正负
 		if coefficient < 0 {
 			// 生成减法运算
 			equation = fmt.Sprintf("%d %s", -1*subSum+sum, equation)
 		} else {
-			// 生成加法运算
+			// 根据 sum 和 subSum 的大小决定加减法运算符
 
-			// 保证 sum > subSum
-			if sum < subSum {
-				sum, subSum = subSum, sum
-			}
-
-			// 生成加法运算
-			if RandBool() {
-				// 加到前面
-				equation = fmt.Sprintf("%d + %s", sum-subSum, equation)
+			if sum > subSum {
+				// 生成加法运算
+				if RandBool() {
+					// 加到前面
+					equation = fmt.Sprintf("%d + %s", sum-subSum, equation)
+				} else {
+					// 加到后面
+					equation = fmt.Sprintf("%s + %d", equation, sum-subSum)
+				}
 			} else {
-				// 加到后面
-				equation = fmt.Sprintf("%s+ %d", equation, sum-subSum)
+				// 生成减法运算
+				equation = fmt.Sprintf("%s - %d", equation, subSum-sum)
 			}
-
 		}
 
 		return equation
 	}
 }
 
-// 构造简单计算等式
-func CalculateSimple(sum int) string {
+// 构造一个数字计算等式(包含运算符，但不含未知数)
+func NewCalculateSimple(sum int) string {
 	isPlus := RandBool()
 	if sum == 1 {
 		isPlus = false
@@ -141,25 +151,22 @@ func CalculateSimple(sum int) string {
 	}
 }
 
-// 反向构造一个公式
-func ReverseEquation(sum int) string {
-	return ""
-}
-
-// 构造一个公式
-func NewEquation(side SideCount, bracket bool, minValue, maxValue int, minCoefficient, maxCoefficient int) (string, int) {
+// 构造一元一次公式
+func NewEquation(side SideCount, needBracket bool, value int, minCoefficient, maxCoefficient int) (string, int) {
 	var sum int
 	var equation string
-	value := RandInt(minValue, maxValue)
 
 	// 第一章节：生成公式1
 	// 第一步：确定系数
-	coefficientOne := RandIntExcludeZero(minCoefficient, maxCoefficient)
-	sum = coefficientOne * value
-	if coefficientOne != -1 {
-		equation = fmt.Sprintf("%d%s", coefficientOne, Operands[1])
-	} else {
+	coefficient := RandIntExcludeZero(minCoefficient, maxCoefficient)
+	sum = coefficient * value
+	switch coefficient {
+	case 1:
+		equation = Operands[1]
+	case -1:
 		equation = fmt.Sprintf("-%s", Operands[1])
+	default:
+		equation = fmt.Sprintf("%d%s", coefficient, Operands[1])
 	}
 
 	// 第二步：确定前后整数
@@ -170,21 +177,20 @@ func NewEquation(side SideCount, bracket bool, minValue, maxValue int, minCoeffi
 		equation = fmt.Sprintf("%d %s", left, equation)
 	} else {
 		// 如果为正，则需要随机选择前后置一个数
+		add := RandInt(2, sum*3)
+		sum = add + sum
 		if RandBool() {
-			// 前置一个数
-			left := RandInt(2, sum*3)
-			sum = left + sum
-			equation = fmt.Sprintf("%d + %s", left, equation)
+			// 前置一个加数
+
+			equation = fmt.Sprintf("%d + %s", add, equation)
 		} else {
-			// 后置一个数
-			right := RandInt(1, sum-1)
-			sum = sum + right
-			equation = fmt.Sprintf("%s -%d", equation, right)
+			// 后置一个加数
+			equation = fmt.Sprintf("%s + %d", equation, add)
 		}
 	}
 
 	// 第三步：确定括号
-	if bracket {
+	if needBracket {
 		// 需要增加括号
 		equation = fmt.Sprintf("(%s)", equation)
 
@@ -236,7 +242,7 @@ func NewEquation(side SideCount, bracket bool, minValue, maxValue int, minCoeffi
 	return equation, sum
 }
 
-// 打印公式
+// 打印一元一次等式
 func (e *EquationOneOperand) String() string {
 	if RandBool() {
 		return Standardize(fmt.Sprintf("%s = %s", e.equation1, e.equation2))
@@ -249,9 +255,15 @@ func (e *EquationOneOperand) String() string {
 func Standardize(equation string) string {
 	var buf strings.Builder
 	var previousCharIsMinux bool
+	var previousCharIsSpace bool
 	// 遍历字符
 	for _, c := range equation {
+		if previousCharIsSpace && c == ' ' {
+			// 去掉连续的空格
+			continue
+		}
 		if previousCharIsMinux && c != ' ' {
+			// 在减号后面加一个空格
 			buf.WriteRune(' ')
 			previousCharIsMinux = false
 		}
@@ -259,7 +271,17 @@ func Standardize(equation string) string {
 		if c == '-' {
 			previousCharIsMinux = true
 		}
+		if c == ' ' {
+			previousCharIsSpace = true
+		} else {
+			previousCharIsSpace = false
+		}
 	}
 
 	return buf.String()
+}
+
+// 反向构造一元一次公式
+func ReverseEquation(value, sum int) string {
+	return ""
 }
