@@ -2,7 +2,10 @@ module github.com/woshizilong/equation
 
 go 1.18
 
-require github.com/johnfercher/maroto v0.38.0
+require (
+	github.com/johnfercher/maroto v0.38.0
+	github.com/shopspring/decimal v1.3.1
+)
 
 require (
 	github.com/boombuler/barcode v1.0.1 // indirect

@@ -3,6 +3,8 @@ package util
 import (
 	"fmt"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 var Operands = map[int]string{
@@ -285,15 +287,18 @@ func Standardize(equation string) string {
 // 反向构造一元一次公式
 //
 // 参数：
-//    operand: 未知数符号
-//    excludeCoefficient: 未知数的系数，反推公式中系数应该避免这个值
-//    value: 未知数的值
-//    sum: 公式的值
-//    needBracket: 是否需要括号
-//    minCoefficient: 系数范围最小值
-//    maxCoefficient: 系数范围最大值
+//
+//	operand: 未知数符号
+//	excludeCoefficient: 未知数的系数，反推公式中系数应该避免这个值
+//	value: 未知数的值
+//	sum: 公式的值
+//	needBracket: 是否需要括号
+//	minCoefficient: 系数范围最小值
+//	maxCoefficient: 系数范围最大值
+//
 // 返回：
-//    公式字符串
+//
+//	公式字符串
 func ReverseEquation(operand string, excludeCoefficient, value, sum int, needBracket bool, minCoefficient, maxCoefficient int) string {
 	var coefficientNew, coefficientBracket int
 	var sumNew int
@@ -389,4 +394,36 @@ func ReverseEquation(operand string, excludeCoefficient, value, sum int, needBra
 	}
 
 	return equation
+}
+
+type MultiplyingDecimals struct {
+	// 被乘数
+	Multiplier Digital
+	// 乘数
+	Multiplicand Digital
+	// 乘积
+	Product decimal.Decimal
+	// 显示值
+	String string
+}
+
+// 生成小数乘法计算式
+// 参数：
+//
+//	i：整数位数
+//	f：小数位数
+func NewMultiplyingDecimals(minInteger, maxInteger, minDecimal, maxDecimal int) MultiplyingDecimals {
+	result := &MultiplyingDecimals{}
+
+	z := RandInt(minInteger, maxInteger)
+	x := RandInt(minDecimal, maxDecimal)
+	result.Multiplier = NewDigital(z, x)
+
+	z = RandInt(minInteger, maxInteger)
+	x = RandInt(minDecimal, maxDecimal)
+	result.Multiplicand = NewDigital(z, x)
+	result.Product = result.Multiplier.Value.Mul(result.Multiplicand.Value)
+	result.String = fmt.Sprintf("%s × %s", result.Multiplier.ValueString, result.Multiplicand.ValueString)
+
+	return *result
 }
